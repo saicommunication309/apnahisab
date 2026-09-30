@@ -14,7 +14,6 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const total = (k) => k.entries.reduce((s, e) => s + Number(e.amount || 0), 0);
 
 // ====== શરૂઆતનો ડેટા: નોટબુકના પહેલા 8 ખાતા ======
-// naam/gaon ? વાળા હસ્તાક્ષર પરથી વાંચ્યા છે - નોટબુક સાથે મેળવીને એપમાં સુધારી લેજો.
 const mk = (naam, gaon, amounts, kirayaIdx = [], note = "") => {
   const id = uid();
   return {
@@ -125,6 +124,7 @@ export default function App() {
   return (
     <Shell>
       <div className="top">
+        <h2 className="title">📒</h2>
         <input
           className="month"
           value={data.month}
@@ -146,17 +146,19 @@ export default function App() {
         onChange={(e) => setQ(e.target.value)}
       />
 
-      {list.map(({ k, no }) => (
-        <div key={k.id} className="card" onClick={() => setOpenId(k.id)}>
-          <div>
-            <div className="nm">{no}. {k.naam || "(નામ નથી)"}</div>
-            <small>{k.gaon || "ગામ નથી"} · {k.entries.length} એન્ટ્રી</small>
-            {k.note && <div className="warn">⚠ {k.note}</div>}
+      <div className="ruled">
+        {list.map(({ k, no }) => (
+          <div key={k.id} className="line" onClick={() => setOpenId(k.id)}>
+            <div>
+              <div className="nm">{no}. {k.naam || "(નામ નથી)"}</div>
+              <small>{k.gaon || "ગામ નથી"} · {k.entries.length} એન્ટ્રી</small>
+              {k.note && <div className="warn">⚠ {k.note}</div>}
+            </div>
+            <b className="amt">{inr(total(k))}</b>
           </div>
-          <b>{inr(total(k))}</b>
-        </div>
-      ))}
-      {list.length === 0 && <p className="mut">કંઈ મળ્યું નથી.</p>}
+        ))}
+        {list.length === 0 && <p className="mut">કંઈ મળ્યું નથી.</p>}
+      </div>
 
       <NewKhata onAdd={addKhata} />
 
@@ -179,16 +181,18 @@ function Login({ onOk }) {
   return (
     <div className="login">
       <h1>📒 હિસાબ</h1>
-      <input placeholder="યુઝર આઈડી" value={id} onChange={(e) => setId(e.target.value)} />
-      <input
-        placeholder="પાસવર્ડ"
-        type="password"
-        value={pw}
-        onChange={(e) => setPw(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && go()}
-      />
-      {err && <div className="err">{err}</div>}
-      <button onClick={go}>લૉગિન</button>
+      <div className="box">
+        <input placeholder="યુઝર આઈડી" value={id} onChange={(e) => setId(e.target.value)} />
+        <input
+          placeholder="પાસવર્ડ"
+          type="password"
+          value={pw}
+          onChange={(e) => setPw(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && go()}
+        />
+        {err && <div className="err">{err}</div>}
+        <button onClick={go}>લૉગિન</button>
+      </div>
     </div>
   );
 }
@@ -217,62 +221,145 @@ function NewKhata({ onAdd }) {
   );
 }
 
-function Detail({ k, onBack, onChange, onDelete }) {
-  const [amt, setAmt] = useState("");
-  const [date, setDate] = useState("");
-  const [kiraya, setKiraya] = useState(false);
+const MONTHS = ["જાન્યુઆરી","ફેબ્રુઆરી","માર્ચ","એપ્રિલ","મે","જૂન","જુલાઈ","ઓગસ્ટ","સપ્ટેમ્બર","ઓક્ટોબર","નવેમ્બર","ડિસેમ્બર"];
+const DAYS = ["રવિ","સોમ","મંગળ","બુધ","ગુરુ","શુક્ર","શનિ"];
+const pad = (n) => String(n).padStart(2, "0");
+const iso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+const fmtDate = (d) => (d ? d.split("-").reverse().join("/") : "—");
 
+function Detail({ k, onBack, onChange, onDelete }) {
+  const now = new Date();
+  const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
+  const [sel, setSel] = useState(iso(now.getFullYear(), now.getMonth(), now.getDate()));
+  const [amt, setAmt] = useState("");
+  const [vigat, setVigat] = useState("");
+  const [kiraya, setKiraya] = useState(false);
+  const [edit, setEdit] = useState(false);
+
+  const byDate = useMemo(() => {
+    const o = {};
+    k.entries.forEach((e) => {
+      if (e.date) o[e.date] = (o[e.date] || 0) + Number(e.amount || 0);
+    });
+    return o;
+  }, [k.entries]);
+
+  const first = new Date(ym.y, ym.m, 1).getDay();
+  const days = new Date(ym.y, ym.m + 1, 0).getDate();
+  const cells = [...Array(first).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
+  const prefix = `${ym.y}-${pad(ym.m + 1)}`;
+  const monthTotal = k.entries.filter((e) => (e.date || "").startsWith(prefix)).reduce((s, e) => s + Number(e.amount || 0), 0);
+  const todayIso = iso(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const go = (delta) => {
+    const d = new Date(ym.y, ym.m + delta, 1);
+    setYm({ y: d.getFullYear(), m: d.getMonth() });
+  };
   const add = () => {
     const a = Number(amt);
     if (!a) return;
-    onChange({ entries: [...k.entries, { id: uid(), amount: a, date, kiraya }] });
+    onChange({ entries: [...k.entries, { id: uid(), amount: a, date: sel, kiraya, vigat: vigat.trim() }] });
     setAmt("");
+    setVigat("");
     setKiraya(false);
   };
   const del = (id) => onChange({ entries: k.entries.filter((e) => e.id !== id) });
-  const fmtDate = (d) => (d ? d.split("-").reverse().join("/") : "—");
+  const setDate = (id, date) => onChange({ entries: k.entries.map((e) => (e.id === id ? { ...e, date } : e)) });
+
+  const dayList = k.entries.filter((e) => e.date === sel);
+  const undated = k.entries.filter((e) => !e.date);
+
+  const Row = ({ e, undatedRow }) => (
+    <div className="line slim">
+      <div>
+        <b className="amt">{inr(e.amount)}</b> {e.kiraya && <span className="tag">ભાડું</span>}
+        {e.vigat && <div><small>{e.vigat}</small></div>}
+      </div>
+      <div className="row" style={{ width: "auto" }}>
+        {undatedRow && (
+          <button className="ghost noprint" style={{ margin: 0, padding: "5px 8px", fontSize: 12 }} onClick={() => setDate(e.id, sel)}>
+            {fmtDate(sel)} મૂકો
+          </button>
+        )}
+        <button className="x noprint" onClick={() => del(e.id)}>✕</button>
+      </div>
+    </div>
+  );
 
   return (
     <>
-      <button className="ghost noprint" onClick={onBack}>← પાછા</button>
-
-      <div className="box">
-        <div className="row">
-          <input placeholder="નામ" value={k.naam} onChange={(e) => onChange({ naam: e.target.value })} />
-          <input placeholder="ગામ" value={k.gaon} onChange={(e) => onChange({ gaon: e.target.value })} />
-        </div>
-        <input placeholder="નોંધ" value={k.note} onChange={(e) => onChange({ note: e.target.value })} />
+      <div className="row noprint" style={{ justifyContent: "space-between" }}>
+        <button className="ghost" onClick={onBack}>← પાછા</button>
+        <button className="ghost" onClick={() => setEdit(!edit)}>✎ નામ સુધારો</button>
       </div>
+
+      <div className="khname">
+        <h2>{k.naam || "(નામ નથી)"}</h2>
+        <small>{k.gaon || "ગામ નથી"}</small>
+        {k.note && <div className="warn">⚠ {k.note}</div>}
+      </div>
+
+      {edit && (
+        <div className="box noprint">
+          <div className="row">
+            <input placeholder="નામ" value={k.naam} onChange={(e) => onChange({ naam: e.target.value })} />
+            <input placeholder="ગામ" value={k.gaon} onChange={(e) => onChange({ gaon: e.target.value })} />
+          </div>
+          <input placeholder="નોંધ" value={k.note} onChange={(e) => onChange({ note: e.target.value })} />
+          <button className="danger" onClick={onDelete}>આ ખાતું કાઢી નાખો</button>
+        </div>
+      )}
 
       <div className="grand">
-        <div>આ ખાતાનો સરવાળો</div>
+        <div>આ ખાતાનો કુલ સરવાળો</div>
         <b>{inr(total(k))}</b>
-        <small>{k.entries.length} એન્ટ્રી</small>
+        <small>{MONTHS[ym.m]}: {inr(monthTotal)}</small>
       </div>
 
-      {k.entries.map((e, i) => (
-        <div key={e.id} className="card slim">
-          <div>
-            {i + 1}. <b>{inr(e.amount)}</b> {e.kiraya && <span className="tag">ભાડું</span>}
-            <small> · {fmtDate(e.date)}</small>
+      <div className="cal">
+        <div className="calhd">
+          <button className="ghost noprint" onClick={() => go(-1)}>‹</button>
+          <b>{MONTHS[ym.m]} {ym.y}</b>
+          <button className="ghost noprint" onClick={() => go(1)}>›</button>
+        </div>
+        <div className="grid">
+          {DAYS.map((d) => <div key={d} className="dn">{d}</div>)}
+          {cells.map((d, i) => {
+            if (!d) return <div key={"e" + i} />;
+            const key = iso(ym.y, ym.m, d);
+            return (
+              <div key={key} className={"day" + (key === sel ? " sel" : "") + (key === todayIso ? " today" : "") + (byDate[key] ? " has" : "")} onClick={() => setSel(key)}>
+                <span>{d}</span>
+                {byDate[key] && <em>{Number(byDate[key]).toLocaleString("en-IN")}</em>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="box">
+        <b>📅 {fmtDate(sel)}</b>
+        {dayList.length === 0 && <div className="mut" style={{ margin: "6px 0" }}>આ તારીખે કોઈ એન્ટ્રી નથી.</div>}
+        {dayList.map((e) => <Row key={e.id} e={e} />)}
+        <div className="noprint">
+          <div className="row">
+            <input type="number" inputMode="numeric" placeholder="રકમ" value={amt} onChange={(e) => setAmt(e.target.value)} />
+            <input placeholder="વિગત (વૈકલ્પિક)" value={vigat} onChange={(e) => setVigat(e.target.value)} />
           </div>
-          <button className="x noprint" onClick={() => del(e.id)}>✕</button>
+          <label className="chk">
+            <input type="checkbox" checked={kiraya} onChange={(e) => setKiraya(e.target.checked)} /> ભાડું
+          </label>
+          <button onClick={add}>{fmtDate(sel)} ની એન્ટ્રી ઉમેરો</button>
         </div>
-      ))}
-
-      <div className="box noprint">
-        <b>+ નવી એન્ટ્રી</b>
-        <div className="row">
-          <input type="number" inputMode="numeric" placeholder="રકમ" value={amt} onChange={(e) => setAmt(e.target.value)} />
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </div>
-        <label className="chk">
-          <input type="checkbox" checked={kiraya} onChange={(e) => setKiraya(e.target.checked)} /> ભાડું
-        </label>
-        <button onClick={add}>ઉમેરો</button>
       </div>
 
-      <button className="danger noprint" onClick={onDelete}>આ ખાતું કાઢી નાખો</button>
+      {undated.length > 0 && (
+        <div className="box">
+          <b>તારીખ વગરની એન્ટ્રી ({undated.length})</b>
+          <div className="mut" style={{ fontSize: 13 }}>ઉપર તારીખ પસંદ કરી "મૂકો" દબાવો</div>
+          {undated.map((e) => <Row key={e.id} e={e} undatedRow />)}
+        </div>
+      )}
     </>
   );
 }
@@ -286,32 +373,54 @@ function Shell({ children }) {
   );
 }
 
+// ====== નોટબુક ડિઝાઇન ======
 const css = `
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+Gujarati:wght@400;600;700&display=swap');
 *{box-sizing:border-box}
-body{margin:0;background:#eef2f7;font-family:system-ui,-apple-system,"Noto Sans Gujarati","Shruti",sans-serif;color:#1b1f24}
-.wrap{max-width:520px;margin:0 auto;padding:12px 12px 40px}
-h1{text-align:center;color:#1F3A5F}
-input{width:100%;padding:11px;border:1px solid #c5d0dc;border-radius:8px;font-size:16px;margin:4px 0;background:#fff}
-button{padding:11px 14px;border:0;border-radius:8px;background:#1F3A5F;color:#fff;font-size:15px;width:100%;margin-top:6px}
-button.ghost{background:#fff;color:#1F3A5F;border:1px solid #1F3A5F;width:auto}
-button.danger{background:#b3261e;margin-top:16px}
-button.x{width:auto;background:#fff;color:#b3261e;border:1px solid #e3b5b1;padding:6px 10px;margin:0}
+body{margin:0;background:#e9e1c8;font-family:"Noto Serif Gujarati",Georgia,serif;color:#2b2a26}
+.wrap{max-width:520px;margin:0 auto;min-height:100vh;padding:14px 14px 40px;background:#fbf6e9;border-left:3px double #d9a79c;box-shadow:0 0 18px #0002}
+h1{text-align:center;color:#7a2e1d;margin:0 0 14px}
+input{width:100%;padding:11px;border:1px dashed #b9ac82;border-radius:6px;font-size:16px;margin:4px 0;background:#fffdf5;color:#2b2a26;font-family:inherit}
+input:focus{outline:2px solid #7a2e1d55;border-style:solid}
+button{padding:11px 14px;border:0;border-radius:6px;background:#7a2e1d;color:#fff;font-size:15px;width:100%;margin-top:6px;font-family:inherit}
+button.ghost{background:transparent;color:#7a2e1d;border:1px solid #7a2e1d;width:auto}
+button.danger{background:#a3261b;margin-top:16px}
+button.x{width:auto;background:transparent;color:#a3261b;border:1px solid #dcb1ab;padding:5px 10px;margin:0}
 .top{display:flex;gap:8px;align-items:center}
-.month{font-size:20px;font-weight:700;border:0;background:transparent;color:#1F3A5F}
-.grand{background:#1F3A5F;color:#fff;border-radius:12px;padding:14px;margin:8px 0;text-align:center}
-.grand b{display:block;font-size:30px}
-.grand small{opacity:.8}
-.card{background:#fff;border-radius:10px;padding:12px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;box-shadow:0 1px 2px #0002}
-.card.slim{padding:8px 12px}
-.nm{font-weight:600}
-small,.mut{color:#5a6672}
+.title{margin:0;font-size:24px}
+.month{font-size:21px;font-weight:700;border:0;background:transparent;color:#7a2e1d;margin:0}
+.grand{border:2px solid #7a2e1d;border-radius:6px;background:#fff8e1;color:#7a2e1d;padding:12px;margin:12px 0;text-align:center}
+.grand b{display:block;font-size:32px}
+.grand small{color:#7b7562}
+.search{background:#fffdf5}
+.ruled{margin:6px 0 10px;border-top:2px solid #7a2e1d}
+.line{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 4px;border-bottom:1px solid #d9cfae;cursor:pointer}
+.line:active{background:#f3ead0}
+.line.slim{padding:8px 4px;cursor:default}
+.nm{font-weight:700}
+.amt{color:#7a2e1d;font-size:17px}
+small,.mut{color:#7b7562}
 .warn{font-size:12px;color:#8a5a00;margin-top:3px}
-.box{background:#fff;border-radius:10px;padding:12px;margin:10px 0}
+.box{background:#fff8e1;border:1px solid #d9cfae;border-radius:6px;padding:12px;margin:12px 0}
 .row{display:flex;gap:8px}
 .chk{display:flex;align-items:center;gap:8px;margin:4px 0}
 .chk input{width:auto}
-.tag{background:#fde9c9;color:#8a5a00;border-radius:6px;padding:1px 7px;font-size:12px}
-.err{color:#b3261e;margin:4px 0}
-.login{margin-top:20vh}
-@media print{.noprint{display:none!important}body{background:#fff}.card{box-shadow:none;border:1px solid #ccc}}
+.tag{background:#f6dfae;color:#7a4a00;border-radius:4px;padding:1px 7px;font-size:12px}
+.err{color:#a3261b;margin:4px 0}
+.login{margin-top:16vh}
+.khname{text-align:center;margin:10px 0 0}
+.khname h2{margin:0;font-size:26px;color:#7a2e1d}
+.cal{background:#fffdf5;border:1px solid #d9cfae;border-radius:6px;padding:10px;margin:12px 0}
+.calhd{display:flex;justify-content:space-between;align-items:center;color:#7a2e1d;margin-bottom:6px}
+.calhd button{margin:0;padding:4px 14px;font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.dn{text-align:center;font-size:12px;color:#7b7562;padding:2px 0}
+.day{min-height:46px;border:1px solid #e6dcbb;border-radius:5px;padding:3px;display:flex;flex-direction:column;align-items:center;cursor:pointer;background:#fff}
+.day span{font-size:14px}
+.day em{font-style:normal;font-size:9.5px;color:#7a2e1d;font-weight:700;margin-top:auto}
+.day.has{background:#f6e3c0}
+.day.today{border-color:#7a2e1d}
+.day.sel{background:#7a2e1d;color:#fff}
+.day.sel em{color:#ffe9b8}
+@media print{body{background:#fff}.wrap{box-shadow:none;border:0}.noprint{display:none!important}}
 `;
