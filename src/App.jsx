@@ -6,26 +6,28 @@ import { useState, useEffect, useMemo } from "react";
 const ADMIN_ID = "Admin01";
 const ADMIN_PASS = "30092026";
 
-const DATA_KEY = "hisab-data-v1";
+const DATA_KEY = "hisab-data-v2";
 const AUTH_KEY = "hisab-auth-v1";
 
 const inr = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
 const uid = () => Math.random().toString(36).slice(2, 9);
 const total = (k) => k.entries.reduce((s, e) => s + Number(e.amount || 0), 0);
 
-// ====== શરૂઆતનો ડેટા: નોટબુકના પહેલા 8 ખાતા ======
-const mk = (naam, gaon, amounts, kirayaIdx = [], note = "") => {
+// ====== શરૂઆતનો ડેટા: સપ્ટેમ્બર 2026 હિસાબ (PDF મુજબ) ======
+// [તારીખ, રકમ] — તારીખ 0 એટલે તારીખ વંચાઈ નથી (નીચે "તારીખ વગરની" માં રહેશે)
+const mk = (naam, gaon, list, note = "") => {
   const id = uid();
   return {
     id,
     naam,
     gaon,
     note,
-    entries: amounts.map((a, i) => ({
+    entries: list.map(([d, amount], i) => ({
       id: id + "-" + i,
-      amount: a,
-      date: "",
-      kiraya: kirayaIdx.includes(i),
+      amount,
+      date: d ? `2026-09-${String(d).padStart(2, "0")}` : "",
+      kiraya: false,
+      vigat: "",
     })),
   };
 };
@@ -33,14 +35,22 @@ const mk = (naam, gaon, amounts, kirayaIdx = [], note = "") => {
 const SEED = {
   month: "સપ્ટેમ્બર 2026",
   khatas: [
-    mk("Mahesh?", "Magatra?", [1000, 200, 200, 1500, 1500]),
-    mk("Soma?", "Kudiya", [2000, 1450, 1400, 100, 700, 700, 1400, 1000], [5, 6], "1450/1400 નોટબુકમાં ચેક કરો"),
-    mk("Sohiy?", "", [1500, 2020, 1350, 200, 1000, 200, 2530, 1330], [], "છેલ્લી 1330 અને 2020 ચેક કરો"),
-    mk("Sahil?", "Ghodapat", [700, 1000, 1000, 1000, 1000], [], "ભાડાની બીજી વ્યક્તિ અસ્પષ્ટ"),
-    mk("Rahil?", "Bhoiwadi", [1000, 1000, 1500, 850, 200, 1000, 900, 1500, 1350, 1500]),
-    mk("Soma?", "", [1350, 1000, 300, 900, 1000], [], "ભાડું: Raju / Bhoiwadi. પહેલી 1350 કપાયેલી લાગે છે"),
-    mk("Sajil?", "Kudiya", [1300, 100, 5050, 1200, 150, 1350, 200, 1200, 1000], [], "5050 ચેક કરો"),
-    mk("", "Kudiya", [100, 1800, 1000, 1000, 5000, 200, 1000, 1000, 1000], [], "નામ વંચાયું નથી. 1800 ચેક કરો"),
+    mk("Mahesh", "", [[6, 1000], [11, 200], [14, 200], [20, 1500], [27, 1500]]),
+    mk("Soma?", "Kudadiya", [[11, 2000], [14, 1450], [0, 1400], [0, 100], [0, 700], [0, 700], [0, 1400]]),
+    mk("Sohil?", "", [[3, 1500], [5, 2020], [11, 1350], [14, 200], [15, 1000], [0, 200], [22, 2530], [0, 1330], [27, 1000]]),
+    mk("Kalpesh?", "Ghodapat", [[0, 700], [3, 1000], [14, 1000], [21, 1000], [27, 1000]]),
+    mk("Rajesh?", "", [[0, 1000], [0, 1000], [0, 1500], [0, 850], [0, 200], [0, 1000], [0, 900], [0, 1500], [0, 1350], [0, 1500]]),
+    mk("Soma? / Raju", "", [[4, 1350], [10, 1000], [12, 300], [26, 900], [27, 1000]], "ભાડું (rent)"),
+    mk("Sanjay?", "", [[3, 1300], [5, 100], [6, 5050], [8, 1200], [15, 150], [15, 1350], [0, 200], [22, 1200], [27, 1000]]),
+    mk("Vyas?", "", [[0, 100], [0, 1800], [0, 1000], [0, 1000], [0, 5000], [0, 200], [0, 1000], [0, 800], [0, 1000]]),
+    mk("Girish? / Ganesh", "", [[20, 1000], [24, 1230]]),
+    mk("Mahendra?", "", [[0, 800], [0, 100], [0, 1350], [0, 1000], [0, 700], [0, 2000], [27, 1000]]),
+    mk("Manoj?", "", [[11, 2000], [12, 1000], [14, 200], [19, 1000], [0, 600], [22, 1000]]),
+    mk("(નામ વંચાયું નથી)", "", [[0, 700], [3, 1000], [14, 1000], [0, 1000], [0, 2020]]),
+    mk("Kailash?", "Ghodapat", [[2, 1000], [5, 1600], [14, 2020], [16, 300], [26, 1000]]),
+    mk("Pavan", "", [[0, 1000], [3, 1000], [5, 1500], [10, 1000], [0, 70], [17, 1500], [0, 1500]]),
+    mk("Dipak?", "", [[3, 2000], [14, 1000], [28, 1000]]),
+    mk("Hiram?", "", [[3, 1500], [8, 1500], [0, 500], [14, 10100], [17, 1500], [25, 1500]]),
   ],
 };
 
@@ -229,8 +239,11 @@ const fmtDate = (d) => (d ? d.split("-").reverse().join("/") : "—");
 
 function Detail({ k, onBack, onChange, onDelete }) {
   const now = new Date();
-  const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
-  const [sel, setSel] = useState(iso(now.getFullYear(), now.getMonth(), now.getDate()));
+  // કેલેન્ડર છેલ્લી એન્ટ્રીવાળા મહિનામાં ખૂલે; એન્ટ્રી ન હોય તો આજના મહિનામાં
+  const latest = k.entries.map((e) => e.date).filter(Boolean).sort().pop();
+  const start = latest ? new Date(latest + "T00:00:00") : now;
+  const [ym, setYm] = useState({ y: start.getFullYear(), m: start.getMonth() });
+  const [sel, setSel] = useState(iso(start.getFullYear(), start.getMonth(), start.getDate()));
   const [amt, setAmt] = useState("");
   const [vigat, setVigat] = useState("");
   const [kiraya, setKiraya] = useState(false);
@@ -418,9 +431,9 @@ small,.mut{color:#7b7562}
 .day{min-height:46px;border:1px solid #e6dcbb;border-radius:5px;padding:3px;display:flex;flex-direction:column;align-items:center;cursor:pointer;background:#fff}
 .day span{font-size:14px}
 .day em{font-style:normal;font-size:9.5px;color:#7a2e1d;font-weight:700;margin-top:auto}
-.day.has{background:#f6e3c0}
+.day.has{background:#c8ebc9;border-color:#2e8b3d}
 .day.today{border-color:#7a2e1d}
-.day.sel{background:#7a2e1d;color:#fff}
-.day.sel em{color:#ffe9b8}
+.day.has em{color:#14532d}
+.day.sel{outline:3px solid #7a2e1d;outline-offset:1px}
 @media print{body{background:#fff}.wrap{box-shadow:none;border:0}.noprint{display:none!important}}
 `;
