@@ -495,7 +495,7 @@ export default function App() {
 
   const list = data.khatas
     .map((k, i) => ({ k, no: i + 1 }))
-    .filter(({ k }) => (k.naam + " " + k.gaon).toLowerCase().includes(q.trim().toLowerCase()));
+    .filter(({ no }) => !q.trim() || no === Number(q.trim())); // ફક્ત કાર્ડ નંબરથી શોધ
 
   const addKhata = (naam, gaon) =>
     setData((d) => ({ ...d, khatas: [...d.khatas, { id: uid(), naam, gaon, note: "", entries: [] }] }));
@@ -528,9 +528,9 @@ export default function App() {
 
       <input
         className="noprint search"
-        placeholder="🔍 નામ કે ગામ શોધો"
+        inputMode="numeric" placeholder="🔍 કાર્ડ નંબર લખો"
         value={q}
-        onChange={(e) => setQ(e.target.value)}
+        onChange={(e) => setQ(e.target.value.replace(/\D/g, ""))}
       />
 
       <div className="ruled">
